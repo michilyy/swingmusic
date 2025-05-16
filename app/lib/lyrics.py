@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Iterable
-
+import datetime
 from app.store.tracks import TrackStore
 
 
@@ -15,16 +15,20 @@ def split_line(line: str):
     return (time, lyric.strip())
 
 
-def convert_to_milliseconds(time: str):
+def convert_to_milliseconds(time: str) -> int:
     """
     Converts a lyrics time string into milliseconds.
+
+    :args time: timestring in format "{Minute}:{Second}". Minute can be greater than 59
+    :returns: milliseconds if successful else 0
     """
     try:
-        minutes, seconds = time.split(":")
+        minit, sec = time.split(":")
+        minit, sec = int(minit), int(sec)
     except ValueError:
         return 0
 
-    milliseconds = int(minutes) * 60 * 1000 + float(seconds) * 1000
+    milliseconds = datetime.timedelta(minutes=minit, seconds=sec).total_seconds() * 1000
     return int(milliseconds)
 
 
@@ -67,16 +71,12 @@ def get_lyrics_file_rel_to_track(filepath: str):
         return lyrics_path
 
 
-def check_lyrics_file_rel_to_track(filepath: str):
+def check_lyrics_file_rel_to_track(filepath: str) -> bool:
     """
     Checks if the lyrics file exists relative to the track file
     """
     lyrics_path = Path(filepath).with_suffix(".lrc")
-
-    if lyrics_path.exists():
-        return True
-    else:
-        return False
+    return lyrics_path.exists()
 
 
 def get_lyrics(track_path: str, trackhash: str):
@@ -160,7 +160,7 @@ def test_is_synced(lyrics: list[str]):
     return False
 
 
-def get_lyrics_from_tags(trackhash: str, just_check: bool = False):
+def get_lyrics_from_tags(trackhash: str, just_check: bool = False) -> tuple[None, bool, str]:
     """
     Gets the lyrics from the tags of the track
     """
@@ -171,8 +171,8 @@ def get_lyrics_from_tags(trackhash: str, just_check: bool = False):
 
     lyrics: str | None = None
     copyright: str | None = None
-    synced = False
 
+    # check all tracks and stop if lyrics and copyright contains something
     for track in entry.tracks:
         if lyrics and copyright:
             break
