@@ -16,16 +16,19 @@ def has_connection(host="google.it", port=80, timeout=3):
         return False
 
 
-def get_ip():
+def get_ip(server:str="8.8.8.8") -> str|None:
     """
-    Returns the IP address of this device.
+    Returns the public IP address of this device.
+
+    :param server: Server address for retrieving public IP address. Default: "8.8.8.8"
+    :return: public IP if successful, None otherwise.
     """
-    soc = Socket.socket(Socket.AF_INET, Socket.SOCK_DGRAM)
+
     try:
-        soc.connect(("8.8.8.8", 80))
+        with Socket.socket(Socket.AF_INET, Socket.SOCK_DGRAM) as soc:
+            soc.connect((server, 80))
+            return str(soc.getsockname()[0])
+
     except OSError:
         return None
-    ip_address = str(soc.getsockname()[0])
-    soc.close()
 
-    return ip_address

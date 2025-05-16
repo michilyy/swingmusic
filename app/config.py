@@ -5,6 +5,7 @@ from typing import Any
 from .settings import Paths
 
 # TODO: Publish this on PyPi
+#       Package folder should match package name
 
 
 @dataclass
