@@ -4,7 +4,7 @@ import datetime
 from app.store.tracks import TrackStore
 
 
-def split_line(line: str):
+def split_line(line: str) -> tuple[str, str]:
     """
     Split a lyrics line into time and lyrics
     """
@@ -12,7 +12,7 @@ def split_line(line: str):
     time = items[0].removeprefix("[")
     lyric = items[1] if len(items) > 1 else ""
 
-    return (time, lyric.strip())
+    return time, lyric.strip()
 
 
 def convert_to_milliseconds(time: str) -> int:
@@ -24,7 +24,7 @@ def convert_to_milliseconds(time: str) -> int:
     """
     try:
         minit, sec = time.split(":")
-        minit, sec = int(minit), int(sec)
+        minit, sec = int(minit), float(sec)
     except ValueError:
         return 0
 
@@ -32,10 +32,14 @@ def convert_to_milliseconds(time: str) -> int:
     return int(milliseconds)
 
 
-def format_synced_lyrics(lines: Iterable[str]):
+def format_synced_lyrics(lines: Iterable[str]) -> list[dict[int, str]]:
     """
     Formats synced lyrics into a list of dicts
+
+    :args lines: list of lyrics lines
+    :returns: [{ "time": 00001, "text": "your lyrics" }, ...]
     """
+
     lyrics = []
 
     for line in lines:
@@ -56,6 +60,8 @@ def format_synced_lyrics(lines: Iterable[str]):
 
 
 def get_lyrics_from_lrc(filepath: str | Path):
+    """"""
+
     with open(filepath, mode="r") as file:
         lines = (f.removesuffix("\n") for f in file.readlines())
         return format_synced_lyrics(lines)
@@ -82,6 +88,11 @@ def check_lyrics_file_rel_to_track(filepath: str) -> bool:
 def get_lyrics(track_path: str, trackhash: str):
     """
     Gets the lyrics for a track
+
+
+    :args track_path: TODO
+    :args trackhash: TODO
+    :returns: lyrics if successful else 0
     """
     lyrics_path = get_lyrics_file_rel_to_track(track_path)
 
