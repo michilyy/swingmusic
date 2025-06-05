@@ -20,7 +20,46 @@ import os
 from datetime import datetime, timezone
 
 
-def start_swingmusic(host: str, port: int):
+
+def config_mimetypes():
+    """
+    Load mimetypes for the web client's static files
+    Loading mimetypes should happen automatically but
+    sometimes the mimetypes are not loaded correctly
+    eg. when the Registry is messed up on Windows.
+
+    See the following issues:
+    https://github.com/swingmx/swingmusic/issues/137
+    """
+
+
+    mimetypes.add_type("text/css", ".css")
+    mimetypes.add_type("text/javascript", ".js")
+    mimetypes.add_type("text/plain", ".txt")
+    mimetypes.add_type("text/html", ".html")
+    mimetypes.add_type("image/webp", ".webp")
+    mimetypes.add_type("image/svg+xml", ".svg")
+    mimetypes.add_type("image/png", ".png")
+    mimetypes.add_type("image/vnd.microsoft.icon", ".ico")
+    mimetypes.add_type("image/gif", ".gif")
+    mimetypes.add_type("font/woff", ".woff")
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
+
+
+def setup_logger():
+    """
+    config werkzeug and waitress logger
+    to only report ERROR exceptions
+    """
+    # logging.disable(logging.CRITICAL)
+    # werkzeug = logging.getLogger("werkzeug")
+    # werkzeug.setLevel(logging.ERROR)
+
+    waitress_logger = logging.getLogger("waitress")
+    waitress_logger.setLevel(logging.ERROR)
+
+
+def start_swingmusic(host: str, port: int, base_config_path:pathlib.Path|str):
     """
     Creates and starts the Flask application server for Swing Music.
 
@@ -42,41 +81,8 @@ def start_swingmusic(host: str, port: int):
     # Example: Setting up dirs, database, and loading stuff into memory.
     # TIP: Be careful with the order of the setup functions.
 
-    # Load mimetypes for the web client's static files
-    # Loading mimetypes should happen automatically but
-    # sometimes the mimetypes are not loaded correctly
-    # eg. when the Registry is messed up on Windows.
-
-    # See the following issues:
-    # https://github.com/swingmx/swingmusic/issues/137
-
-    mimetypes.add_type("text/css", ".css")
-    mimetypes.add_type("text/javascript", ".js")
-    mimetypes.add_type("text/plain", ".txt")
-    mimetypes.add_type("text/html", ".html")
-    mimetypes.add_type("image/webp", ".webp")
-    mimetypes.add_type("image/svg+xml", ".svg")
-    mimetypes.add_type("image/png", ".png")
-    mimetypes.add_type("image/vnd.microsoft.icon", ".ico")
-    mimetypes.add_type("image/gif", ".gif")
-    mimetypes.add_type("font/woff", ".woff")
-    mimetypes.add_type("application/manifest+json", ".webmanifest")
-
-    # logging.disable(logging.CRITICAL)
-    # werkzeug = logging.getLogger("werkzeug")
-    # werkzeug.setLevel(logging.ERROR)
-
-    waitress_logger = logging.getLogger("waitress")
-    waitress_logger.setLevel(logging.ERROR)
-
-    log_startup_info(host, port)
-
-    @background
-    def run_swingmusic():
-        register_plugins()
-
-        setproctitle.setproctitle(f"swingmusic {host}:{port}")
-        start_cron_jobs()
+    config_mimetypes()
+    setup_logger()
 
     # Setup function calls
     settings.Info.load()
