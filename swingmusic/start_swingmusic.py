@@ -1,3 +1,4 @@
+import pathlib
 from swingmusic import settings
 from swingmusic.api import create_api
 from swingmusic.crons import start_cron_jobs
@@ -16,7 +17,6 @@ from flask_jwt_extended import create_access_token, get_jwt, get_jwt_identity, s
 
 import logging
 import mimetypes
-import os
 from datetime import datetime, timezone
 
 
@@ -157,33 +157,31 @@ def start_swingmusic(host: str, port: int, base_config_path:pathlib.Path|str):
         """
         Serves the static files in the client folder.
         """
+
         js_or_css = path.endswith(".js") or path.endswith(".css")
+
         if not js_or_css:
             return app.send_static_file(path)
 
-        gzipped_path = path + ".gz"
-        user_agent = request.headers.get("User-Agent")
-
         # INFO: Safari doesn't support gzip encoding
         # See issue: https://github.com/swingmx/swingmusic/issues/155
-        is_safari = (
-            user_agent
-            and user_agent.find("Safari") >= 0
-            and user_agent.find("Chrome") < 0
-        )
-
-        if is_safari:
+        user_agent = request.headers.get("User-Agent")
+        if "Safari" in user_agent and not "Chrome" in user_agent:
             return app.send_static_file(path)
 
-        accepts_gzip = request.headers.get("Accept-Encoding", "").find("gzip") >= 0
+        gzipped_path = pathlib.Path(app.static_folder or "") / path
+        gzipped_path = gzipped_path.with_suffix(".gz")
 
-        if accepts_gzip:
-            if os.path.exists(os.path.join(app.static_folder or "", gzipped_path)):
-                response = app.make_response(app.send_static_file(gzipped_path))
+        if "gzip" in request.headers.get("Accept-Encoding", ""):
+            if gzipped_path.exists():
+                response = app.make_response(app.send_static_file(str(gzipped_path)))
                 response.headers["Content-Encoding"] = "gzip"
                 return response
 
-        return app.send_static_file(path)
+        else:
+            return app.send_static_file(path)
+
+
 
     @app.route("/")
     def serve_client():
@@ -192,7 +190,17 @@ def start_swingmusic(host: str, port: int, base_config_path:pathlib.Path|str):
         """
         return app.send_static_file("index.html")
 
+
+    @background
+    def run_swingmusic():
+        register_plugins()
+
+        setproctitle.setproctitle(f"swingmusic {host}:{port}")
+        start_cron_jobs()
+
+
     load_into_mem()
+    log_startup_info()
     run_swingmusic()
     # TrackStore.export()
     # ArtistStore.export()
