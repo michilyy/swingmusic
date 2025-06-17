@@ -1,10 +1,8 @@
-Architecture
-============
+# Architecture
 
 
+### TODO:
 
-
-#### TODO:
 * api for all api calls
 * cron for all cron jobs
 * data for files
