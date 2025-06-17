@@ -48,6 +48,15 @@ dependency-metadata = [
     { name = "bjoern", version="3.2.2", requires-dist = [], requires-python = ">=3.11"}
 ]
 
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "myst-parser",
+    "furo",
+    "sphinx-design"
+]
+
 [project.scripts]
 swingmusic = "swingmusic.__main__:main"
 
