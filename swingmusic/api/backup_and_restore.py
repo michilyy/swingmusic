@@ -7,9 +7,10 @@ import shutil
 from time import time
 from flask_openapi3 import Tag
 from flask_openapi3 import APIBlueprint
+import sqlalchemy.exc
 from swingmusic.api.auth import admin_required
 
-from swingmusic.db.userdata import FavoritesTable, PlaylistTable, ScrobbleTable
+from swingmusic.db.userdata import FavoritesTable, PlaylistTable, ScrobbleTable, CollectionTable
 from swingmusic.lib.index import index_everything
 from swingmusic.settings import Paths
 from datetime import datetime
@@ -28,7 +29,7 @@ api = APIBlueprint(
 @admin_required()
 def backup():
     """
-    Create a backup file of your favorites, playlists and scrobble data.
+    Create a backup file of your favorites, playlists, scrobble data, and collections.
     """
     backup_name = f"backup.{int(time())}"
     backup_dir = Path("~").expanduser() / "swingmusic.backup" / backup_name
@@ -77,10 +78,23 @@ def backup():
             shutil.copy(img_path, img_folder / playlist["image"])
 
     # !SECTION
+
+    # SECTION: Collections
+    collections_list = list(CollectionTable.get_all())
+    collections_dicts = []
+    
+    for collection in collections_list:
+        # Remove auto-generated id field
+        collection_copy = collection.copy()
+        if "id" in collection_copy:
+            del collection_copy["id"]
+        collections_dicts.append(collection_copy)
+    # !SECTION
     data = {
         "favorites": favorites,
         "scrobbles": scrobbles,
         "playlists": playlist_dicts,
+        "collections": collections_dicts,
     }
 
     with open(backup_file, "w") as f:
@@ -92,10 +106,14 @@ def backup():
         "scrobbles": len(scrobbles),
         "favorites": len(favorites),
         "playlists": len(playlist_dicts),
+        "collections": len(collections_dicts),
     }, 200
 
 
 class RestoreBackup:
+    # TODO: BACKUP AND RESTORE MIXES!
+    # TODO: IMPROVE UX WHEN WAITING FOR RESTORE TO COMPLETE!
+
     def __init__(self, backup_dir: Path):
         self.backup_dir = backup_dir
         self.backup_file = backup_dir / "data.json"
@@ -105,6 +123,7 @@ class RestoreBackup:
         self.restore_favorites(self.data["favorites"])
         self.restore_playlists(self.data["playlists"])
         self.restore_scrobbles(self.data["scrobbles"])
+        self.restore_collections(self.data.get("collections", []))
 
     def restore(self):
         pass
@@ -114,8 +133,12 @@ class RestoreBackup:
         existing_hashes = set(fav.hash for fav in existing_favorites)
         new_favorites = [fav for fav in favorites if fav["hash"] not in existing_hashes]
 
-        if new_favorites:
-            FavoritesTable.insert_many(new_favorites)
+        for fav in new_favorites:
+            try:
+                FavoritesTable.insert_item(fav)
+            except sqlalchemy.exc.IntegrityError:
+                print("Integrity error, skipping favorite")
+                print(fav)
 
     def restore_playlists(self, playlists: list[dict]):
         existing_playlists = PlaylistTable.get_all()
@@ -124,8 +147,15 @@ class RestoreBackup:
             playlist for playlist in playlists if playlist["name"] not in existing_names
         ]
 
-        if new_playlists:
-            PlaylistTable.insert_many(new_playlists)
+        for playlist in new_playlists:
+            try:
+                if playlist.get("_score") is not None:
+                    del playlist["_score"]
+
+                PlaylistTable.add_one(playlist)
+            except sqlalchemy.exc.IntegrityError:
+                print("Integrity error, skipping playlist:")
+                print(playlist)
 
     def restore_scrobbles(self, scrobbles: list[dict]):
         existing_scrobbles = ScrobbleTable.get_all(0)
@@ -139,8 +169,32 @@ class RestoreBackup:
             if f"{scrobble['trackhash']}.{scrobble['timestamp']}" not in existing_hashes
         ]
 
-        if new_scrobbles:
-            ScrobbleTable.insert_many(new_scrobbles)
+        for scrobble in new_scrobbles:
+            try:
+                ScrobbleTable.add(scrobble)
+            except sqlalchemy.exc.IntegrityError:
+                print("Integrity error, skipping scrobble:")
+                print(scrobble)
+
+    def restore_collections(self, collections: list[dict]):
+        existing_collections = list(CollectionTable.get_all())
+        existing_names = set(collection["name"] for collection in existing_collections)
+        new_collections = [
+            collection for collection in collections if collection["name"] not in existing_names
+        ]
+
+        for collection in new_collections:
+            try:
+                # Ensure userid is set for the collection
+                if collection.get("userid") is None:
+                    from swingmusic.utils.auth import get_current_userid
+                    collection["userid"] = get_current_userid()
+                
+                CollectionTable.insert_one(collection)
+            except sqlalchemy.exc.IntegrityError:
+                print("Integrity error, skipping collection:")
+                print(collection)
+
 
 
 class RestoreBackupBody(BaseModel):
@@ -155,7 +209,7 @@ class RestoreBackupBody(BaseModel):
 @admin_required()
 def restore(body: RestoreBackupBody):
     """
-    Restore your favorites, playlists and scrobble data from a specified backup or all backups.
+    Restore your favorites, playlists, scrobble data, and collections from a specified backup or all backups.
     """
     backup_base_dir = Path("~").expanduser() / "swingmusic.backup"
     backups = []
@@ -227,10 +281,12 @@ def list_backups():
                 backup_info["scrobbles"] = len(data.get("scrobbles", []))
                 backup_info["favorites"] = len(data.get("favorites", []))
                 backup_info["playlists"] = len(data.get("playlists", []))
+                backup_info["collections"] = len(data.get("collections", []))
         else:
             backup_info["scrobbles"] = 0
             backup_info["favorites"] = 0
             backup_info["playlists"] = 0
+            backup_info["collections"] = 0
 
         backups.append(backup_info)
 
