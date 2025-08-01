@@ -11,9 +11,8 @@ import sqlalchemy.exc
 from swingmusic.api.auth import admin_required
 
 from swingmusic.db.userdata import FavoritesTable, PlaylistTable, ScrobbleTable, CollectionTable
-from swingmusic.lib.index import index_everything
+from swingmusic.utils.jobs import JobManager, Index
 from swingmusic.settings import Paths
-from datetime import datetime
 from swingmusic.utils.dates import timestamp_to_time_passed
 
 from pydantic import BaseModel, Field
@@ -238,7 +237,7 @@ def restore(body: RestoreBackupBody):
             restore_backup.restore()
             backups.append(backup_dir.name)
 
-    index_everything()
+    JobManager.launch(Index(independent=True))
     return {"msg": f"Restored successfully", "backups": backups}, 200
 
 
