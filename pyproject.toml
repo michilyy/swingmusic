@@ -46,6 +46,11 @@ build = [
     "pyinstaller"
 ]
 
+docs = [
+    "sphinx",
+    "furo"
+]
+
 [tool.uv]
 dependency-metadata = [
     { name = "waitress", version = "3.0.2", requires-dist = [], requires-python = ">=3.11" },
