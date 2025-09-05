@@ -24,7 +24,7 @@ def create_folder(path: str, trackcount=0) -> Folder:
     )
 
 
-def get_folders(paths: list[str]):
+def get_folders(paths: list[str]) -> list:
     """
     Filters out folders that don't have any tracks and
     returns a list of folder objects.

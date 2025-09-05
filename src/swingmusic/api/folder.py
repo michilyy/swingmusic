@@ -83,16 +83,31 @@ def get_folder_tree(body: FolderTree):
     config = UserConfig()
     root_dirs = config.rootDirs
 
-    if req_dir == "$home" and "$home" in root_dirs:
-        req_dir = settings.Paths().USER_HOME_DIR.as_posix()
+    results = {
+        "req_dir": req_dir,
+        "folders": [],
+        "tracks": []
+    }
+
 
     if req_dir == "$home":
-            folders = get_folders(root_dirs)
-
-            return {
-                "folders": folders,
-                "tracks": [],
+        if config.showPlaylistsInFolderView:
+            playlists_item = {
+                "name": "Playlists",
+                "path": "$playlists",
+                "trackcount": sum(p.count for p in PlaylistTable.get_all()),
             }
+
+            favorites_item = {
+                "name": "Favorites",
+                "path": "$favorites",
+                "trackcount": FavoritesTable.get_fav_tracks(0, -1)[1],
+            }
+
+            results["folders"].insert(0, playlists_item)
+            results["folders"].insert(0, favorites_item)
+            results["folders"].extend(get_folders(root_dirs))
+
 
     if req_dir.startswith("$playlist"):
         splits = req_dir.split("/")
@@ -142,8 +157,12 @@ def get_folder_tree(body: FolderTree):
             "path": req_dir,
         }
 
-    # TODO: currently only fixed on unix. Windows/Mac still pending.
-    # note
+
+    if req_dir == "$home":
+        if "$home" in root_dirs:
+            req_dir = settings.Paths().USER_HOME_DIR.as_posix()
+        else:
+            return results
 
     if not pathlib.Path(req_dir).exists():
         req_dir = "/" + req_dir
@@ -158,23 +177,6 @@ def get_folder_tree(body: FolderTree):
         tracksort_reverse=body.tracksort_reverse,
         foldersort_reverse=body.foldersort_reverse,
     )
-
-    if og_req_dir == "$home" and config.showPlaylistsInFolderView:
-        # Get all playlists and return them as a list of folders
-        playlists_item = {
-            "name": "Playlists",
-            "path": "$playlists",
-            "trackcount": sum(p.count for p in PlaylistTable.get_all()),
-        }
-
-        favorites_item = {
-            "name": "Favorites",
-            "path": "$favorites",
-            "trackcount": FavoritesTable.get_fav_tracks(0, -1)[1],
-        }
-
-        results["folders"].insert(0, playlists_item)
-        results["folders"].insert(0, favorites_item)
 
     return results
 
