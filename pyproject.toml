@@ -72,6 +72,3 @@ dev = [
     "pyinstaller",
     "ruff"
 ]
-
-[tool.ruff]
-lint.extend-select = ["I"]

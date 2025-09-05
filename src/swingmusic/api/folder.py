@@ -76,7 +76,6 @@ def get_folder_tree(body: FolderTree):
 
     Returns a list of all the folders and tracks in the given folder.
     """
-    og_req_dir = body.folder
     req_dir = body.folder
     tracks_only = body.tracks_only
 
@@ -84,14 +83,59 @@ def get_folder_tree(body: FolderTree):
     root_dirs = config.rootDirs
 
     results = {
-        "req_dir": req_dir,
+        "path": req_dir,
         "folders": [],
         "tracks": []
     }
 
 
+    if req_dir.startswith("$playlist"):
+        splits = req_dir.split("/")
+
+        if len(splits) == 2:
+            # return requests playlist
+            pid = splits[1]
+            playlist = PlaylistTable.get_by_id(int(pid))
+            tracks = TrackStore.get_tracks_by_trackhashes(
+                playlist.trackhashes[
+                    body.start : body.start + body.limit if body.limit != -1 else None
+                ]
+            )
+
+            results["path"] = f"$playlist/{playlist.name}"
+            results["tracks"] = serialize_tracks(tracks)
+
+        else:
+            # return overview of playlist
+            playlists = PlaylistTable.get_all()
+            playlists = sorted(
+                playlists,
+                key=lambda p: datetime.strptime(p.last_updated, "%Y-%m-%d %H:%M:%S"),
+                reverse=True,
+            )
+
+            results["folders"] = [
+                    {
+                        "name": p.name,
+                        "path": f"$playlist/{p.id}",
+                        "trackcount": p.count,
+                    }
+                    for p in playlists
+                ]
+
+        return results
+
+    if req_dir == "$favorites":
+        tracks, total = FavoritesTable.get_fav_tracks(body.start, body.limit)
+        tracks = TrackStore.get_tracks_by_trackhashes([t.hash for t in tracks])
+
+        results["tracks"] = serialize_tracks(tracks)
+        return results
+
     if req_dir == "$home":
+
         if config.showPlaylistsInFolderView:
+            # extend results with playlists and favs
             playlists_item = {
                 "name": "Playlists",
                 "path": "$playlists",
@@ -108,62 +152,13 @@ def get_folder_tree(body: FolderTree):
             results["folders"].insert(0, favorites_item)
             results["folders"].extend(get_folders(root_dirs))
 
-
-    if req_dir.startswith("$playlist"):
-        splits = req_dir.split("/")
-
-        if len(splits) == 2:
-            pid = splits[1]
-            playlist = PlaylistTable.get_by_id(int(pid))
-            tracks = TrackStore.get_tracks_by_trackhashes(
-                playlist.trackhashes[
-                    body.start : body.start + body.limit if body.limit != -1 else None
-                ]
-            )
-
-            return {
-                "path": f"$playlist/{playlist.name}",
-                "folders": [],
-                "tracks": serialize_tracks(tracks),
-            }
-
-        playlists = PlaylistTable.get_all()
-        playlists = sorted(
-            playlists,
-            key=lambda p: datetime.strptime(p.last_updated, "%Y-%m-%d %H:%M:%S"),
-            reverse=True,
-        )
-
-        return {
-            "path": req_dir,
-            "folders": [
-                {
-                    "name": p.name,
-                    "path": f"$playlist/{p.id}",
-                    "trackcount": p.count,
-                }
-                for p in playlists
-            ],
-            "tracks": [],
-        }
-
-    if req_dir == "$favorites":
-        tracks, total = FavoritesTable.get_fav_tracks(body.start, body.limit)
-        tracks = TrackStore.get_tracks_by_trackhashes([t.hash for t in tracks])
-
-        return {
-            "tracks": serialize_tracks(tracks),
-            "folders": [],
-            "path": req_dir,
-        }
-
-
-    if req_dir == "$home":
         if "$home" in root_dirs:
             req_dir = settings.Paths().USER_HOME_DIR.as_posix()
         else:
             return results
 
+
+    # TODO: ?path on unix systems would sometimes resolve relative
     if not pathlib.Path(req_dir).exists():
         req_dir = "/" + req_dir
 
