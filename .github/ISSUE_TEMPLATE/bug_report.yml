@@ -4,6 +4,10 @@ title: "[Bug]: "
 labels: [""]
 projects: [""]
 body:
+  - type: checkboxes
+    attributes:
+      label: Is there an existing issue for this?
+      description: Please search to see if an issue already exists for the bug you encountered.
   - type: input
     id: os-version
     attributes:
@@ -65,10 +69,14 @@ body:
       placeholder: Tell us what you see!
     validations:
       required: true
-
   - type: textarea
     id: logs
     attributes:
       label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      description: |
+        Please launch swingmusic in debug mode with `swingmusic --debug <your params>`.
+        Then reproduce the error and upload the log file located in your `Data folder`.
+        The location of your `Data folder` is displayed on start.
+        Please also copy the text in your terminal here.
+        You can just drop the file in this windows to upload it.
       render: shell
